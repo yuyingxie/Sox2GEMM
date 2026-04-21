@@ -393,7 +393,45 @@ salmon quant -i ms_index -l A \
     -1 _W658G/658WG9/658WG9_1.fastq.gz \
     -2 658_WG/658WG9/658WG9_2.fastq.gz \
     -p 8 -o WG_sample_9_quants_nogccorrection /
+library("tximport")
+library("readr")
+library("tximportData")
+library(dplyr)
+library("ggplot2")
 
+library(vsn)
+dir <- system.file("extdata", package="tximportData")
+samples <- read.table(file.path(dir,"samples.txt"), header=TRUE)
+samples$condition <- factor(rep(c("A","B"),each=3))
+rownames(samples) <- samples$run
+samples[,c("pop","center","run","condition")]
+
+## ----txiFiles------------------------------------------------------------
+files <- file.path(dir,"salmon", samples$run, "quant.sf.gz")
+names(files) <- samples$run
+tx2gene <- read_csv(file.path(dir, "tx2gene.gencode.v27.csv"))
+## ----tximport, results="hide"--------------------------------------------
+txi <- tximport(files, type="salmon", tx2gene=tx2gene)
+## ----txi2dds, results="hide"---------------------------------------------
+library("DESeq2")
+ddsTxi <- DESeqDataSetFromTximport(txi,  colData = samples,
+        design = ~ condition)
+
+log.cts.one <- log2(cts + 1)
+meanSdPlot(log.cts.one, ranks = FALSE)
+
+dds <- estimateSizeFactors(dds)
+
+df = bind_rows(
+          as_data_frame(log2(counts(dds, normalized=TRUE)[, 1:2]+1)) %>%
+                         mutate(transformation = "log2(x + 1)"),
+          as_data_frame(assay(vsd)[, 1:2]) %>% mutate(transformation = "vst"),
+          as_data_frame(assay(rld)[, 1:2]) %>% mutate(transformation = "rlog")
+  )
+
+colnames(df)[1:2] <- c("x", "y")  
+ggplot(df, aes(x = x, y = y)) + geom_hex(bins = 80) +
+          coord_fixed() + facet_grid( . ~ transformation)  
 
 ###################################
 ### Bulk 5211HT             #######
