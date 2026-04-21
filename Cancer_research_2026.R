@@ -393,4 +393,301 @@ salmon quant -i ms_index -l A \
     -1 _W658G/658WG9/658WG9_1.fastq.gz \
     -2 658_WG/658WG9/658WG9_2.fastq.gz \
     -p 8 -o WG_sample_9_quants_nogccorrection /
-        
+
+
+###################################
+### Bulk 5211HT             #######
+###################################     
+---
+title: "5211HT"
+author: "Zhaoheng Li"
+date: "3/7/2022"
+output: html_document
+---
+```{r}
+library(DESeq2)
+library(dplyr)
+library(ggplot2)
+library(tibble)
+library(factoextra)
+```
+
+
+```{r}
+data <- read.delim("gene_expected_count.annot.txt")
+
+
+WT_IL1R = data[-(55422:55426),paste("Sample_5211.HT.",1:10,sep='')]
+rownames(WT_IL1R)=data$gene_id[-(55422:55426)]
+WT_KO = data[-(55422:55426),paste("Sample_5211.HT.",11:20,sep='')]
+rownames(WT_KO)=data$gene_id[-(55422:55426)]
+```
+
+```{r IL1R}
+
+coldata = data.frame(condition = factor(c(rep("WT",5),rep("IL1R",5))))
+WT_IL1R <- DESeqDataSetFromMatrix(countData = WT_IL1R,
+                              colData = coldata,
+                              design = ~ condition)
+WT_IL1R
+WT_IL1R$condition <- relevel(WT_IL1R$condition, ref = "WT")
+WT_IL1R <- DESeq(WT_IL1R)
+res.WT_IL1R <- results(WT_IL1R)
+
+```
+
+
+```{r WT_KO}
+coldata = data.frame(condition = factor(c(rep("WT",5),rep("KO",5))))
+WT_KO <- DESeqDataSetFromMatrix(countData = WT_KO,
+                              colData = coldata,
+                              design = ~ condition)
+WT_KO
+WT_KO$condition <- relevel(WT_KO$condition, ref = "WT")
+WT_KO <- DESeq(WT_KO)
+res.WT_KO <- results(WT_KO)
+
+
+```
+
+
+```{r}
+res.WT_IL1R=data.frame(res.WT_IL1R)%>%arrange(log2FoldChange)
+res.WT_KO=data.frame(res.WT_KO)%>%arrange(log2FoldChange)
+
+res.WT_IL1R=res.WT_IL1R%>%rownames_to_column()%>%left_join(data%>%select(gene_id,external_gene_name,description),
+                                                           by = c("rowname"="gene_id"))
+res.WT_KO=res.WT_KO%>%rownames_to_column()%>%left_join(data%>%select(gene_id,external_gene_name,description),
+                                                       by = c("rowname"="gene_id"))
+head(res.WT_IL1R)
+```
+```{r}
+res.WT_IL1R%>%filter(external_gene_name=='Il1r1')
+res.WT_KO%>%filter(external_gene_name=='Il1r1')
+```
+
+
+```{r}
+write.csv(res.WT_IL1R,"DEres.1-10.csv")
+write.csv(res.WT_KO,"DEres.11-20.csv")
+```
+
+
+
+```{r}
+WT_KO <- estimateSizeFactors(WT_KO)
+WT_IL1R=estimateSizeFactors(WT_IL1R)
+colData(WT_KO)
+sizeFactors(WT_KO)
+assay(WT_KO,normalized=TRUE)
+
+pdf("hie_cluster.pdf")
+d <- dist(t(assay(WT_KO,normalized=TRUE)), method = "euclidean") # distance matrix
+fit <- hclust(d, method="complete")
+plot(fit) # display dendogram
+d <- dist(t(assay(WT_IL1R,normalized=TRUE)), method = "euclidean") # distance matrix
+fit <- hclust(d, method="complete")
+plot(fit) # display dendogram
+dev.off()
+```
+
+
+```{r}
+pdf("MOR.Norm_hie_cluster.pdf")
+d <- dist(t(t(t(assay(WT_KO))/sizeFactors(WT_KO))), method = "euclidean") # distance matrix
+fit <- hclust(d, method="complete")
+plot(fit) # display dendogram
+d <- dist(t(t(t(assay(WT_IL1R))/sizeFactors(WT_IL1R))), method = "euclidean") # distance matrix
+fit <- hclust(d, method="complete")
+plot(fit) # display dendogram
+dev.off()
+```
+
+```{r}
+
+WT_IL1R.MOR.pca = prcomp(t(counts(WT_IL1R,normalized=TRUE)))
+fviz_pca_ind(WT_IL1R.MOR.pca,
+             col.ind = "cos2", # Color by the quality of representation
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE     # Avoid text overlapping
+             )
+d <- dist(WT_IL1R.MOR.pca$x[,1:2], method = "euclidean") # distance matrix
+fit <- hclust(d, method="complete")
+plot(fit) # display dendogram
+
+WT_KO.MOR.pca = prcomp(t(counts(WT_KO,normalized=TRUE)))
+fviz_pca_ind(WT_KO.MOR.pca,
+             col.ind = "cos2", # Color by the quality of representation
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE     # Avoid text overlapping
+             )
+d <- dist(WT_KO.MOR.pca$x[,1:2], method = "euclidean") # distance matrix
+fit <- hclust(d, method="complete")
+plot(fit) # display dendogram
+```
+
+
+
+# tpm
+
+```{r}
+tpm.data <- read.delim("/Users/lizhaoheng/Desktop/5211HT/gene_TPM.annot.txt")
+
+
+
+tpm.WT_IL1R = tpm.data[-(55422:55426),paste("Sample_5211.HT.",1:10,sep='')]
+rownames(tpm.WT_IL1R)=data$gene_id[-(55422:55426)]
+tpm.WT_KO = tpm.data[-(55422:55426),paste("Sample_5211.HT.",11:20,sep='')]
+rownames(tpm.WT_KO)=data$gene_id[-(55422:55426)]
+
+```
+
+```{r}
+
+tpm.data%>%filter(external_gene_name=='Il1r1')%>%select(paste("Sample_5211.HT.",1:10,sep=''))
+
+df = data.frame(IL1R =t(tpm.data%>%filter(external_gene_name=='Il1r1')%>%select(paste("Sample_5211.HT.",1:10,sep=''))),condition = factor(rep(c("WT", "IL1R"), each = 5)))
+pdf("tpm.IL1R.pdf")
+df%>%ggplot(aes(x=condition,y=IL1R,color = condition))+
+  geom_boxplot()+
+  theme_classic()+
+  geom_jitter()
+dev.off()
+```
+
+```{r}
+colnames(scl.tpm.WT_IL1R) = paste("HT",1:10,sep='')
+round(scl.tpm.WT_IL1R[1:20,],3)
+```
+
+```{r}
+
+
+sds <- apply(tpm.WT_IL1R,1,sd)
+scl.tpm.WT_IL1R = tpm.WT_IL1R[-which(sds==0),]
+means <- apply(scl.tpm.WT_IL1R,1,mean)
+sds <- apply(scl.tpm.WT_IL1R,1,sd)
+scl.tpm.WT_IL1R <- t(scale(t(scl.tpm.WT_IL1R),center=means,scale=sds))
+
+
+
+
+sds <- apply(tpm.WT_KO,1,sd)
+scl.tpm.WT_KO  = tpm.WT_KO[-which(sds==0),]
+means <- apply(scl.tpm.WT_KO,1,mean)
+sds <- apply(scl.tpm.WT_KO,1,sd)
+scl.tpm.WT_KO <- t(scale(t(scl.tpm.WT_KO),center=means,scale=sds))
+
+
+
+
+pdf("scl_tpm_hieClu.pdf")
+d <- dist(t(scl.tpm.WT_IL1R), method = "euclidean") # distance matrix
+fit <- hclust(d, method="complete")
+plot(fit, 'Pearson correlation') # display dendogram
+d <- dist(t(scl.tpm.WT_KO), method = "euclidean") # distance matrix
+fit <- hclust(d, method="complete")
+plot(fit, 'Pearson correlation') # display dendogram
+#dev.off()
+
+
+c <- cor((scl.tpm.WT_IL1R), method="pearson") 
+d <- as.dist(1-c)
+fit <- hclust(d, method="complete")
+plot(fit, 'Pearson correlation') # display dendogram
+
+
+c <- cor((scl.tpm.WT_KO), method="pearson") 
+d <- as.dist(1-c)
+fit <- hclust(d, method="complete")
+plot(fit, main = 'Pearson correlation') # display dendogram
+dev.off()
+```
+
+
+
+
+## pca
+
+### unscaled
+
+```{r}
+tpm.WT_IL1R.pca = prcomp(t(tpm.WT_IL1R))
+fviz_pca_ind(tpm.WT_IL1R.pca,
+             col.ind = "cos2", # Color by the quality of representation
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE     # Avoid text overlapping
+             )
+d <- dist(tpm.WT_IL1R.pca$x[,1:2], method = "euclidean") # distance matrix
+fit <- hclust(d, method="complete")
+plot(fit) # display dendogram
+
+```
+
+```{r}
+tpm.WT_KO.pca = prcomp(t(tpm.WT_KO))
+fviz_pca_ind(tpm.WT_KO.pca,
+             col.ind = "cos2", # Color by the quality of representation
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE     # Avoid text overlapping
+             )
+d <- dist(tpm.WT_KO.pca$x[,1:5], method = "euclidean") # distance matrix
+fit <- hclust(d, method="complete")
+plot(fit) # display dendogram
+
+```
+
+### scaled
+
+```{r}
+#pdf("scl.tpm.WT_IL1R.pca.pdf")
+tpm.WT_IL1R.pca = prcomp(t(scl.tpm.WT_IL1R))
+fviz_pca_ind(tpm.WT_IL1R.pca,
+             col.ind = "cos2", # Color by the quality of representation
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE     # Avoid text overlapping
+             )
+d <- dist(tpm.WT_IL1R.pca$x[,1:5], method = "euclidean") # distance matrix
+fit <- hclust(d, method="complete")
+plot(fit) # display dendogram
+#dev.off()
+```
+
+```{r}
+#pdf("scl.tpm.WT_KO.pca.pdf")
+tpm.WT_KO.pca = prcomp(t(scl.tpm.WT_KO))
+fviz_pca_ind(tpm.WT_KO.pca,
+             col.ind = "cos2", # Color by the quality of representation
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE     # Avoid text overlapping
+             )
+d <- dist(tpm.WT_KO.pca$x[,1:5], method = "euclidean") # distance matrix
+fit <- hclust(d, method="complete")
+plot(fit) # display dendogram
+#dev.off()
+```
+```{r}
+library(FactoMineR)
+# Compute PCA with ncp = 3
+res.pca <- PCA(t(scl.tpm.WT_KO), ncp = 9)
+# Compute hierarchical clustering on principal components
+res.hcpc <- HCPC(res.pca, graph = FALSE)
+```
+
+```{r}
+fviz_dend(res.hcpc, 
+          cex = 0.7,                     # Label size
+          palette = "jco",               # Color palette see ?ggpubr::ggpar
+          rect = TRUE, rect_fill = TRUE, # Add rectangle around groups
+          rect_border = "jco",           # Rectangle color
+          labels_track_height = 0.8      # Augment the room for labels
+          )
+fviz_cluster(res.hcpc,
+             repel = TRUE,            # Avoid label overlapping
+             show.clust.cent = TRUE, # Show cluster centers
+             palette = "jco",         # Color palette see ?ggpubr::ggpar
+             ggtheme = theme_minimal(),
+             main = "Factor map"
+             )
+```
+
